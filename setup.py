@@ -14,7 +14,7 @@ with open(version_file, 'rt') as f:
 if not re.match(r'^\d+(\.\d+)+$', version):
 	raise Exception("Invalid version '%s' found in version file '%s'" % (version, version_file))
 
-requires = ['PyYAML>=3.09', 'netaddr>=0.7.11', 'python-dateutil>=2.4.2', 'taskforce>=0.3.14']
+requires = []
 
 setup_parms = {
 	'name': name,
@@ -48,7 +48,8 @@ non-blocking network services""",
 		'Topic :: System :: Networking',
 	],
 
-	'scripts': [os.path.join(name)],
+	'packages': [name],
+	#'scripts': [os.path.join('bin', name)],
 	'requires': [re.sub(r'\W.*', '', item) for item in requires],
 	'install_requires': requires
 }
