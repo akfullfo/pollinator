@@ -48,8 +48,7 @@ non-blocking network services""",
 		'Topic :: System :: Networking',
 	],
 
-	'packages': [name, name + '.plugins'],
-	'scripts': [os.path.join('bin', name)],
+	#'scripts': [os.path.join('bin', name)],
 	'requires': [re.sub(r'\W.*', '', item) for item in requires],
 	'install_requires': requires
 }
