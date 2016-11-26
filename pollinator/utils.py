@@ -20,68 +20,6 @@
 import sys, os, re, fcntl, atexit, time, random, signal, inspect, pipes, logging
 from logging.handlers import SysLogHandler
 
-def get_caller(*caller_class, **params):
-	"""
-	Provide a convenient was to report your class and function.
-	Common practice is to use:
-
-		from taskforce.utils import get_caller as my
-
-	You can then log top-of-stack calling details using something
-	like this:
-
-		log.debug("%s: Nothing to report", my(self))
-
-	Outside a class context, my() will report the current module and function name.
-
-	If the param "place" is set, logging will include the file and
-	line number of the call.  This happens automatically if the
-	loglevel of the 'log' param (default is the root logger) is DEBUG.
-
-		log.debug("%s: Nothing to report", my(self, place=True))
-
-	If the param "persist_place" is set, that value will persist across
-	multiple calls until the next call with "persist_place" is set.  For
-	example:
-
-		log.debug("%s: Nothing to report", my(self, persist_place=True))
-		  .  .  .
-		log.debug("%s: Still nothing to report", my(self))
-		  .  .  .
-		log.debug("%s: Nothing to report", my(self, persist_place=False))
-
-		
-"""
-	(frame, file, line, func, contextlist, index) = inspect.stack()[1]
-
-	try: class_name = frame.f_locals["self"].__class__.__name__
-	except: class_name = None
-
-	if class_name:
-		name = class_name + '.'
-	elif caller_class != ():							# pragma: no cover
-		name = inspect.getmodule(caller_class[0]).__name__ + '.'
-	elif hasattr(inspect.getmodule(frame), '__name__'):
-		name = inspect.getmodule(frame).__name__ + '.'
-	else:										# pragma: no cover
-		name = ''
-
-	if func == '__init__' and class_name:
-		name = class_name + '()'
-	elif name == '__main__.':							# pragma: no cover
-		name = func + '()'
-	else:
-		name += func + '()'
-
-	if 'persist_place' in params:
-		get_caller._Persist_Place = params['persist_place']
-
-	log = params.get('log', logging.getLogger())
-	if get_caller._Persist_Place or params.get('place') or log.isEnabledFor(logging.DEBUG):
-		name += ' [+{} {}]'.format(line, os.path.basename(file))
-	return name
-get_caller._Persist_Place = None
-
 def version_sort_key(version, digits=6):
 	"""
 	Produces a canonicalized version string for standard version strings
