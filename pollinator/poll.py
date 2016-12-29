@@ -100,6 +100,9 @@ class poll(object):
 		else:									# pragma: no cover
 			raise Error("System supports neither select.poll() nor select.select()")
 
+	def __len__(self):
+		return len(self._fd_map)
+
 	def get_mode(self):
 		return self._mode
 
@@ -235,6 +238,8 @@ class poll(object):
 			self._xfos.discard(fo)
 
 	def poll(self, timeout=None):
+		if not self._has_registered:
+			raise Error("poll() attempt before any objects have been registered")
 		try:
 			if self._mode == PL_KQUEUE:					# pragma: no cover
 				if timeout is not None:
