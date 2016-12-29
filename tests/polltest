@@ -1,0 +1,76 @@
+#!/usr/bin/env python
+# ________________________________________________________________________
+#
+#  Copyright (C) 2016 Andrew Fullford
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+# ________________________________________________________________________
+#
+
+import logging, argparse
+from pollinator import channel, utils
+
+program = utils.appname()
+def_logging_name = program
+def_pidfile = '/var/run/' + program + '.pid'
+
+def send_signal(pidfile, sig):
+	if pidfile is None:
+		raise Exception("No pid file specified")
+	pid = None
+	with open(pidfile, 'r') as f:
+		pidstr = None
+		try:
+			pidstr = f.readline().strip()
+			pid = int(pidstr)
+		except Exception as e:
+			raise Exception("Invalid pid '%s' in '%s' -- %s"%(str(pidstr), pidfile))
+	os.kill(pid, sig)
+
+p = argparse.ArgumentParser(description="Manage tasks and process pools")
+
+p.add_argument('-V', '--version', action='store_true', help='Report version of package and exit.')
+p.add_argument('-v', '--verbose', action='store_true', help='Verbose logging for debugging.')
+p.add_argument('-q', '--quiet', action='store_true', help='Quiet logging, warnings and errors only.')
+p.add_argument('-l', '--log-syslog', action='store_true', help='Log to syslog instead of stderr.')
+p.add_argument('-L', '--logging-name', action='store', default=def_logging_name, metavar='name',
+			help='Use NAME instead of the default "%s" when logging to syslog.' % (def_logging_name, ))
+
+args = p.parse_args()
+
+if args.version:
+	print(package_version)
+	sys.exit(0)
+
+if args.log_syslog:
+	logparams = {}
+	for addr in ['/dev/log', '/var/run/log']:
+		if os.path.exists(addr):
+			logparams['address'] = addr
+			break
+	log_handler = logging.handlers.SysLogHandler(**logparams)
+	log_formatter = logging.Formatter(fmt="%(name)s[%(process)d]: %(levelname)s %(message).1000s")
+else:
+	log_handler = logging.StreamHandler()
+	log_formatter = logging.Formatter(fmt="%(asctime)s %(levelname)s %(message)s")
+
+log = logging.getLogger(args.logging_name)
+log_handler.setFormatter(log_formatter)
+log.addHandler(log_handler)
+
+if args.verbose:
+	log.setLevel(logging.DEBUG)
+elif args.quiet:
+	log.setLevel(logging.WARNING)
+else:
+	log.setLevel(logging.INFO)
