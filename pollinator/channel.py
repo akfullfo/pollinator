@@ -18,7 +18,7 @@
 #
  
 import os, time, errno, socket, json, re, logging
-from pollinator import poll
+from . import poll
 
 class Error(Exception): pass
 
@@ -114,7 +114,7 @@ class Listener(object):
 			except: pass
 		self._channels = set()
 
-	def call(self, method, **params):
+	def call(self, method, *args, **params):
 		"""
 		Calls the named method on all recorded channels.
 		"args" and "params" are passed straight through.
@@ -161,20 +161,16 @@ class Channel(object):
 		Handle poll() event.  This will read available data and/or
 		write pending data.  When all pending data has been written,
 		the POLLOUT is removed from the pset.
+
+		process() mis a callback, but need a better approach.
 	"""
 		self.log.debug("Handle called")
 		if mask & poll.POLLIN:
-			items = 0
 			for item in self.pump._read():
-				self.
+				self.process(item)
 			if self.reader.connection_lost:
 				self.log.info("EOF on %s connection", repr(self.client))
 				self.close()
-			if items > 0:
-				self.compile()
-				block_cnt = len(self.expression_list)
-				self.log.info("Successful subscription on fd %d with %d filter block%s",
-						self.fileno(), block_cnt, '' if block_cnt == 1 else 's')
 
 		if mask & poll.POLLOUT:
 			self.pump._write()
