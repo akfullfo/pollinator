@@ -17,12 +17,13 @@
 # ________________________________________________________________________
 #
 
-import logging, argparse
-from pollinator import channel, utils
+import socket, errno, logging, argparse
+from pollinator import poll, channel, utils
 
 program = utils.appname()
 def_logging_name = program
 def_pidfile = '/var/run/' + program + '.pid'
+def_message_size = 10
 
 def send_signal(pidfile, sig):
 	if pidfile is None:
@@ -37,7 +38,17 @@ def send_signal(pidfile, sig):
 			raise Exception("Invalid pid '%s' in '%s' -- %s"%(str(pidstr), pidfile))
 	os.kill(pid, sig)
 
-p = argparse.ArgumentParser(description="Manage tasks and process pools")
+def gen_message(size):
+	data = ''
+	line = 0
+	while len(data) < size:
+		line += 1
+		data += 'Line %05d%60send %05d\n' % (line, '', line)
+	if len(data) > size:
+		data = data[:size]
+	return data
+
+p = argparse.ArgumentParser(description="Test pollinator client/server message protocol")
 
 p.add_argument('-V', '--version', action='store_true', help='Report version of package and exit.')
 p.add_argument('-v', '--verbose', action='store_true', help='Verbose logging for debugging.')
@@ -45,6 +56,11 @@ p.add_argument('-q', '--quiet', action='store_true', help='Quiet logging, warnin
 p.add_argument('-l', '--log-syslog', action='store_true', help='Log to syslog instead of stderr.')
 p.add_argument('-L', '--logging-name', action='store', default=def_logging_name, metavar='name',
 			help='Use NAME instead of the default "%s" when logging to syslog.' % (def_logging_name, ))
+p.add_argument('-s', '--message-size', action='store', type=int, default=def_message_size, metavar='bytes',
+			help='Size of message to send, default %s bytes' % repr(def_message_size))
+p.add_argument('-S', '--server', action='store_true',
+			help='Listen on specified address and process messages. Default is to act as client')
+p.add_argument('address', nargs=1, metavar='host:port')
 
 args = p.parse_args()
 
@@ -74,3 +90,48 @@ elif args.quiet:
 	log.setLevel(logging.WARNING)
 else:
 	log.setLevel(logging.INFO)
+
+address = args.address[0]
+if ':' in address:
+	host, port = address.rsplit(':', 1)
+	try:
+		port = int(port)
+	except Exception as e:
+		log.error("Invalid port %s -- %s", repr(port), str(e))
+		exit(2)
+else:
+	log.error("Address in form host:port is required")
+	exit(2)
+
+message = gen_message(args.message_size)
+
+pset = poll.poll()
+sock = socket.socket(socket.AF_INET)
+if args.server:
+	sock.bind((host, port))
+	sock.listen(100)
+	channel.Listener(sock, poll_set=pset, log=log)
+	while True:
+		for c, mask in pset.poll():
+			log.debug("Handling 0x%x with %s", mask, repr(c))
+			resp = c.handle(c, mask)
+			if resp is True:
+				for data in c.read():
+					log.info("Echoing message %s", repr(data))
+					c.queue(data)
+else:
+	sock.setblocking(0)
+	try:
+		sock.connect((host, port))
+	except socket.error as e:
+		if e.errno != errno.EINPROGRESS:
+			raise e
+	chan = channel.Channel(sock, None, poll_set=pset)
+	chan.queue(message)
+	while True:
+		for c, mask in pset.poll():
+			log.debug("Handling 0x%x with %s", mask, repr(c))
+			c.handle(c, mask)
+			for answer in c.read():
+				log.info("Received %s", repr(answer))
+				exit(0)
